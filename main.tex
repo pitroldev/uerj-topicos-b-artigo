@@ -1,48 +1,319 @@
-\documentclass[a4paper]{IEEEtran}
+\documentclass[conference]{IEEEtran}
 
+\usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage[english,brazil]{babel}
+\usepackage[portuguese]{babel}
+\usepackage{cite}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\floatname{algorithm}{Algorítmo}
+\algrenewcommand\algorithmicend{\textbf{fim}}
+\algrenewcommand\algorithmicdo{\textbf{faça}}
+\algrenewcommand\algorithmicwhile{\textbf{enquanto}}
+\algrenewcommand\algorithmicfor{\textbf{para}}
+\algrenewcommand\algorithmicif{\textbf{se}}
+\algrenewcommand\algorithmicelse{\textbf{senão}}
+\algrenewcommand\algorithmicthen{\textbf{então}}
+\algrenewcommand\algorithmicreturn{\textbf{retorna}}
+\algrenewcommand\algorithmicfunction{\textbf{função}}
+\algrenewcommand\algorithmicprocedure{\textbf{procedimento}}
+
+\hbadness=10000
+\vbadness=10000
+
+\title{Além do Modelo Sequencial: Paralelização da Resolução da Equação de Laplace}
+\author{
+    \IEEEauthorblockN{Petro Cardoso}\\
+    \IEEEauthorblockA{
+        Departamento de Engenharia de Sistemas e Computação \\
+        Universidade do Estado do Rio de Janeiro \\
+        Rio de Janeiro, Brasil \\
+        \texttt{Email: petrolcds@gmail.com}
+    }
+}
 
 \begin{document}
 
-\title{Seu Título Aqui}
-\author{Petro Cardoso}
 \maketitle
 
 \begin{abstract}
-    Este é o resumo do seu artigo.
+    Este artigo apresenta uma aplicação computacional que resolve a equação de Laplace em uma matriz, utilizando a iteração de Jacobi. Discutimos a implementação do algoritmo, enfatizando a alocação de memória, a inicialização das condições de contorno e o critério de convergência que define a precisão da solução obtida. Também apresentamos algumas otimizações que podem melhorar o desempenho do algoritmo. Por fim, apresentamos uma implementação paralela com memória compartilhada utilizando a biblioteca \texttt{OpenMP} e uma implementação paralela com memória distribuída utilizando a biblioteca \texttt{MPI}. Realizamos experimentos para medir o desempenho das implementações e discutimos os resultados obtidos.
 \end{abstract}
 
 \section{Introdução}
+% - Qual é o objetivo do artigo?
+% - Contextualização sobre "Equação de Laplace em uma grade 2D regular usando a iteração de Jacobi simples"
+% - Qual é o problema específico? Como a aplicação o resolve?
+% - Quais os problemas de performance? Como pretende resolvê-los?
+% - Resumo dos resultados obtidos
+% - Estrutura do artigo (ultima parte da introdução)
+
 Esta é a seção de introdução do seu artigo.
 
-\section{Código Sequencial} % TODO: Mudar o nome da seção para nome do código
-Esta é a seção de metodologia do seu artigo.
+\section{Trabalhos Relacionados}
+% - Revisão bibliográfica
+% - O que já foi feito?
+% - Quais são as principais contribuições?
+
+Esta é a seção de trabalhos relacionados do seu artigo.
+
+
+\section{Problema da Equação de Laplace pelo método iterativo de Jacobi}
+% - Descrição do problema
+% - Descrição da solução sequencial
+
+% Solução onde é feito a média dos 4 vizinhos
+
+O método iterativo de Jacobi é uma abordagem clássica para resolver a equação de Laplace e é caracterizado pela sua simplicidade e facilidade de implementação, mesmo que possa não ser o método mais eficiente para sistemas de grande escala.
+
+Nesta seção, apresentamos uma aplicação computacional que resolve a equação de Laplace em uma matriz, utilizando a iteração de Jacobi. Discutiremos a implementação do algoritmo, enfatizando a alocação de memória, a inicialização das condições de contorno e o critério de convergência que define a precisão da solução obtida.
+
+\subsection{Alocação e Inicialização}
+
+A base para resolver esta equação numericamente é a representação do espaço bidimensional como uma matriz, ou seja, uma grade 2D. Antes de iniciar as iterações, é crucial alocar memória para duas matrizes: a matriz \texttt{grid} que armazena os valores da solução em cada passo e a matriz \texttt{new\_grid} que é utilizada para armazenar os novos valores calculados durante a iteração.
+
+\begin{algorithm}[H]
+    \caption{Alocação de Memória e Inicialização das Grades}
+    \begin{algorithmic}[1]
+        \Function{AlocaMemoria}{size}
+        \State Aloca, de forma não contígua, memória para as matrizes \texttt{grid} e \texttt{new\_grid} com dimensão \texttt{size} \(\times\) \texttt{size}
+        \EndFunction
+        \\
+        \Function{InicializaGrid}{size}
+        \For{cada ponto $(i, j)$ da grade}
+        \If{a posição $(i, j)$ está no centro da grade}
+        \State Definir o valor da célula $(i, j)$ como 100.0 na matriz
+        \texttt{grid}
+        \Else
+        \State Definir o valor da célula $(i, j)$ como 0.0 na matriz \texttt{grid} e \texttt{new\_grid}
+        \EndIf
+        \EndFor
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+
+
+\subsection{Critério de Convergência}
+
+Para garantir a precisão dos cálculos e evitar iterações desnecessárias, estabelecemos um critério de convergência. Usamos um limiar, definido pela constante \texttt{CONV\_THRESHOLD}, para determinar quando a solução está suficientemente próxima da solução teórica. Se a máxima diferença entre os valores de dois passos consecutivos for menor que este limiar, ou se o número máximo de iterações foi alcançado, então o algoritmo é encerrado.
+
+
+\subsection {Cópia de Matrizes}
+
+Como a matriz \texttt{new\_grid} é usada para armazenar os novos valores calculados durante a iteração, precisamos copiar os valores de \texttt{new\_grid} para \texttt{grid} antes de cada iteração. O algoritmo a seguir descreve este processo:
+
+\begin{algorithm}[H]
+    \caption{Cópia de Matrizes}
+    \begin{algorithmic}[1]
+        \Function{CopiaGrid}{grid, new\_grid, size}
+        \For{cada célula $(i, j)$ da grade \texttt{grid}}
+        \State Copia o valor da célula $(i, j)$ da matriz \texttt{new\_grid} para a matriz \texttt{grid}
+        \EndFor
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+\subsection{Iteração de Jacobi para a Equação de Laplace}
+
+Depois de inicializar as grades, podemos começar a iterar. O algoritmo de iteração de Jacobi é simples e consiste em iterar sobre cada ponto interno da grade (isto é, excluindo os pontos de contorno) e atualizar cada célula com a média dos valores de seus 4 vizinhos. O algoritmo a seguir descreve este processo:
+
+\begin{algorithm}[H]
+    \caption{Iteração de Jacobi para a Equação de Laplace}
+    \begin{algorithmic}[1]
+        \While{tem\_erro e iter\_num $<$ iter\_max\_num}
+        \State tem\_erro $\gets$ 0
+        \For{cada ponto interno $(i, j)$ da grade}
+        \State new\_grid[$i$][$j$] $\gets$ média dos 4 vizinhos de $(i, j)$
+        \State erro $\gets$ \Call{CalculaAbsoluto}{new\_grid[$i$][$j$] - grid[$i$][$j$]}
+        \If{erro $>$ CONV\_THRESHOLD}
+        \State tem\_erro $\gets$ 1
+        \EndIf
+        \EndFor
+        \State Copia os valores de new\_grid para grid com a função CopiaGrid
+        \State iter\_num $\gets$ iter\_num + 1
+        \EndWhile
+    \end{algorithmic}
+\end{algorithm}
+
+O cálculo do número absoluto da diferença entre as matrizes \texttt{grid} e \texttt{new\_grid} é feito com a seguinte função:
+
+\begin{algorithm}[H]
+    \caption{Cálculo do valor absoluto}
+    \begin{algorithmic}[1]
+        \Function{CalculaAbsoluto}{num}
+        \If{num $<$ 0}
+        \State \textbf{return} -num
+        \Else
+        \State \textbf{return} num
+        \EndIf
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+\subsection{Salvamento dos Resultados}
+
+Uma vez que a iteração de Jacobi alcança a convergência, ou o número máximo de iterações é atingido, ocorre o salvamento da solução final da grade para análise futura ou visualização. O seguinte pseudocódigo descreve este processo:
+
+\begin{algorithm}[H]
+    \caption{Salvamento da Grade Final}
+    \begin{algorithmic}[1]
+        \Function{SalvaGrid}{grid, size}
+        \For{cada linha $i$ da grade}
+        \For{cada coluna $j$ da grade}
+        \State Escreve o valor da célula $(i, j)$ em um arquivo ou na saída padrão
+        \EndFor
+        \State Escreve uma quebra de linha
+        \EndFor
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
 
 \section{Otimização de Código Sequencial}
 
-\section{Implementação Paralela OpenMP}
+A implementação original deste algoritmo é simples, mas não é otimizada para desempenho. Nesta seção, apresentamos algumas otimizações que podem melhorar o desempenho do algoritmo.
+
+\subsection{Alocação de Memória Contígua}
+
+Na implementação original, a alocação de memória para as matrizes \texttt{grid} e \texttt{new\_grid} é feita de forma não contígua, ou seja, cada linha da matriz é alocada separadamente. Isso pode causar problemas de desempenho devido à falta de localidade espacial, pois os elementos de uma linha não estão próximos uns dos outros na memória. Para resolver este problema, podemos alocar memória de forma contígua, ou seja, alocar a matriz como um vetor unidimensional e calcular o índice de cada elemento com base na sua posição na matriz. Isso garante que os elementos de uma linha estejam próximos uns dos outros na memória, o que pode melhorar o desempenho do algoritmo.
+
+\begin{algorithm}[H]
+    \caption{Alocação de Memória Contígua}
+    \begin{algorithmic}[1]
+        \Function{AlocaMemoria}{size}
+        \State Aloca, de forma contígua, memória para as matrizes \texttt{grid} e \texttt{new\_grid} em um vetor unidimensional de tamanho \texttt{size} \(\times\) \texttt{size}
+        \EndFunction
+        \\
+        \Function{CalculaIndice}{i, j, size}\
+        \State \textbf{return} $i \times size + j$
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+
+\subsection{Substituição da Função de Valor Absoluto}
+
+O cálculo do valor absoluto é feito com uma função simples que pode ser substituída pela função \texttt{fabs} da biblioteca \texttt{math.h}. Esta função é otimizada para desempenho por ser implementada em linguagem de baixo nível e a sua utilização pode melhorar o desempenho do algoritmo. Portanto, substituímos a função \texttt{CalculaAbsoluto} pela função \texttt{fabs} e incluímos a biblioteca \texttt{math.h} no código.
+
+\subsection{Otimização de Compilação}
+
+O compilador \texttt{gcc} possui uma flag de compilação chamada \texttt{-O3} que ativa um conjunto de otimizações de alto nível que podem melhorar o desempenho do código. Portanto, compilamos o código com esta flag de compilação para obter um melhor desempenho.
+
+
+\section{Implementação Paralela com memória compartilhada}
+
+Durante a medição de desempenho da implementação sequencial, observamos que a maior parte do tempo de execução é gasta na iteração de Jacobi e na cópia de matrizes. Portanto, decidimos paralelizar essas duas partes do código para melhorar o desempenho do algoritmo, utilizando a biblioteca \texttt{OpenMP} para programação paralela com memória compartilhada. Não houve necessidade de paralelizar a alocação de memória e a inicialização das grades, pois essas partes do código são executadas apenas uma vez e não afetam significativamente o desempenho do algoritmo.
+
+
+\subsection{Paralelização da Cópia de Matrizes}
+
+A cópia de matrizes é uma operação simples que pode ser paralelizada facilmente. Portanto, podemos paralelizar o loop externo que itera sobre cada linha da grade. Dessa forma, cada thread pode copiar os valores de uma linha da matriz \texttt{new\_grid} para a matriz \texttt{grid}.
+
+\begin{algorithm}[H]
+    \caption{Paralelização da Cópia de Matrizes}
+    \begin{algorithmic}[1]
+        \Function{CopiaGrid}{grid, new\_grid, size}
+        \State \#pragma omp parallel for
+        \For{cada linha $i$ da grade}
+        \State Copia os valores da linha $i$ da matriz \texttt{new\_grid} para a matriz \texttt{grid}
+        \EndFor
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+
+\subsection{Paralelização da Iteração de Jacobi}
+
+A paralelização do algoritmo de iteração de Jacobi é simples, pois cada célula da grade pode ser atualizada independentemente das outras células. Portanto, podemos paralelizar o loop externo que itera sobre cada célula da grade.
+
+\begin{algorithm}[H]
+    \caption{Iteração Laplace e Verificação do Limiar com OpenMP}
+    \begin{algorithmic}[1]
+        \Function{IteracaoLaplace}{grid, new\_grid, size}
+        \State tem\_erro $\gets$ 0
+        \State \#pragma omp parallel for reduction(|| : tem\_erro)
+        \For{cada ponto interno $(i, j)$ da grade}
+        \State new\_grid[$i$][$j$] $\gets$ média dos 4 vizinhos de $(i, j)$
+        \State local\_error $\gets$ diferença absoluta entre new\_grid e grid
+        \If{local\_error $>$ CONV\_THRESHOLD}
+        \State tem\_erro $\gets$ 1
+        \EndIf
+        \EndFor
+        \State \Return tem\_erro
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+    \caption{Iteração Principal com OpenMP}
+    \begin{algorithmic}[1]
+        \Function{IteracaoPrincipal}{grid, new\_grid, size}
+        \State tem\_erro $\gets$ 1
+        \State iter\_num $\gets$ 0
+        \While{tem\_erro e iter\_num $<$ iter\_max\_num}
+        \State tem\_erro $\gets$ \Call{IteracaoLaplace}{grid, new\_grid, size}
+        \State \Call{CopiaGrid}{grid, new\_grid, size}
+        \State iter\_num $\gets$ iter\_num + 1
+        \EndWhile
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+No Algortimo 8, por conta da cláusula \texttt{reduction(|| : tem\_erro)}, cada thread possui uma cópia local da variável \texttt{tem\_erro} e, no final da iteração, o valor de \texttt{tem\_erro} é atualizado com o valor da operação lógica \texttt{OR} entre o valor local de \texttt{tem\_erro} e o valor global de \texttt{tem\_erro}. Dessa forma, podemos garantir que o valor de \texttt{tem\_erro} seja atualizado corretamente, mesmo que a operação de atualização seja feita por várias threads simultaneamente.
+
+% TODO: Remover caso benchmarks mostrem que não há ganho de desempenho
+\section{Otimização da Implementação Paralela com memória compartilhada}
+
+A cláusula \texttt{reduction(|| : tem\_erro)} utilizada no Algoritmo 8 pode causar problemas de desempenho, pois para a redução ser feita, o valor de \texttt{tem\_erro} precisa ser calculado por todas as threads, criando um possível gargalo de desempenho.
+
+\begin{algorithm}[H]
+    \caption{Iteração Laplace e Verificação do Limiar com OpenMP (Otimizado)}
+    \begin{algorithmic}[1]
+        \Function{IteracaoLaplace}{grid, new\_grid, size}
+        \State tem\_erro $\gets$ 0
+        \State \#pragma omp parallel for
+        \For{cada ponto interno $(i, j)$ da grade}
+        \State new\_grid[$i$][$j$] $\gets$ média dos 4 vizinhos de $(i, j)$
+        \State local\_error $\gets$ diferença absoluta entre new\_grid e grid
+        \If{local\_error $>$ CONV\_THRESHOLD}
+        \State \#pragma omp atomic write
+        \State tem\_erro $\gets$ 1
+        \EndIf
+        \EndFor
+        \State \Return tem\_erro
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+No Algoritmo 10, a cláusula \texttt{atomic write} garante que a operação de escrita na variável \texttt{tem\_erro} seja feita de forma atômica, evitando condições de corrida. Dessa forma, podemos garantir que o valor de \texttt{tem\_erro} seja atualizado corretamente, mesmo que a operação de atualização seja feita por várias threads simultaneamente.
+
+\section{Implementação Paralela com memória distribuída - Controller/Worker}
+
 Esta é a seção de resultados do seu artigo.
 
-\section{Otimização de Código OpenMP}
+\section{Implementação Paralela com memória distribuída - SPMD}
 
-\section{Implementação Paralela MPI}
-Esta é a seção de conclusão do seu artigo.
-
-\section{Otimização de Código MPI}
+Esta é a seção de resultados do seu artigo.
 
 \section{Resultados}
+
+Esta é a seção de resultados do seu artigo.
 
 \subsection{Ambiente}
 
 \subsection{Dados de Entrada}
 
-\subsection{Análise de Desempenho Sequencial}
+\subsection{Análise de Desempenho - Sequencial}
 
-\subsection{Análise de Desempenho OpenMP}
+\subsection{Análise de Desempenho - Memória Compartilhada}
 
-\subsection{Análise de Desempenho MPI}
+\subsection{Análise de Desempenho - Memória Distribuída}
 
 \section{Conclusões}
+
+\nocite{*}
+\bibliographystyle{IEEEtran}
+\bibliography{references.bib}
 
 \end{document}
