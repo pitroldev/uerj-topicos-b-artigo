@@ -68,14 +68,15 @@ Os resultados alcançados demonstram o impacto significativo das estratégias de
 % - O que já foi feito?
 % - Quais são as principais contribuições?
 
-Esta é a seção de trabalhos relacionados do seu artigo.
+Durante a pesquisa para o desenvolvimento deste artigo, não identificamos literatura que aborde diretamente a resolução da equação de Laplace com o método iterativo de Jacobi usando paralelização como explorado aqui. No entanto, encontramos trabalhos que discutem estratégias de paralelização aplicadas a problemas similares ou que utilizam técnicas semelhantes, evidenciando o potencial desta área de estudo.
 
+Um dos artigos que apresenta afinidade com o tema deste trabalho é o "Development of a hybrid parallel algorithm (MPI + OpenMP) for solving the Poisson equation"\cite{kenzhebek2018hybrid}, que detalha uma abordagem híbrida combinando MPI e OpenMP para tirar proveito das capacidades multicore de cada nó em clusters de processamento. Este artigo comenta sobre os benefícios significativos da abordagem híbrida na melhoria da eficiência e do desempenho computacional, ressaltando a vantagem de explorar paralelismos em diferentes níveis - tanto entre memórias distribuídas quanto compartilhadas.
+
+Outra pesquisa relevante é descrita no artigo "MPI-based Adaptive Parallel Grid Services"\cite{abburi2003mpi}. Este trabalho foca em um modelo adaptativo de MPI, apresentando uma estrutura que ajusta dinamicamente a alocação de processos. Ao invés de depender de uma quantidade de processos estáticos que podem ou não estar disponíveis, a proposta é que o sistema MPI adapte-se às circunstâncias, utilizando processadores conforme eles se tornam livres na rede. O algoritmo iterativo de Jacobi é usado nesse contexto como um benchmark, permitindo uma análise comparativa entre a abordagem tradicional (Static MPI) e a proposta adaptativa (Adaptive MPI).
+
+Embora os artigos mencionados não tenham foco específico na equação de Laplace, eles oferecem insights valiosos e ressaltam a relevância da paralelização no âmbito de equações diferenciais parciais, além de fornecerem uma base teórica e prática para aprofundar as pesquisas e desenvolvimentos nesse campo de estudo.
 
 \section{Problema da Equação de Laplace pelo método iterativo de Jacobi}
-% - Descrição do problema
-% - Descrição da solução sequencial
-
-% Solução onde é feito a média dos 4 vizinhos
 
 O método iterativo de Jacobi é uma abordagem clássica para resolver a equação de Laplace e é caracterizado pela sua simplicidade e facilidade de implementação, mesmo que possa não ser o método mais eficiente para sistemas de grande escala.
 
@@ -446,7 +447,7 @@ A seguir, apresentamos os resultados obtidos com a implementação sequencial e 
     \begin{tikzpicture}
         \begin{axis}[
                 enlargelimits=0.15,
-                legend style={at={(0.5,-0.15)},
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
                         anchor=north,legend columns=-1},
                 ylabel={Média do Tempo de Execução (s)},
                 symbolic x coords={512, 1024, 2048, 4096, 8192},
@@ -470,7 +471,7 @@ A seguir, apresentamos os resultados obtidos com a implementação sequencial e 
         \begin{axis}[
                 ybar,
                 enlargelimits=0.15,
-                legend style={at={(0.5,-0.15)},
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
                         anchor=north,legend columns=-1},
                 ylabel={Speed Up},
                 symbolic x coords={512, 1024, 2048, 4096, 8192},
@@ -503,7 +504,7 @@ Durante a medição comparativa de desempenho, foram executadas 20 iterações p
     \begin{tikzpicture}
         \begin{axis}[
                 enlargelimits=0.15,
-                legend style={at={(0.5,-0.15)},
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
                         anchor=north,legend columns=-1},
                 ylabel={Média do Tempo de Execução (s)},
                 symbolic x coords={512, 1024, 2048, 4096, 8192},
@@ -513,12 +514,12 @@ Durante a medição comparativa de desempenho, foram executadas 20 iterações p
             ]
 
             \addplot[smooth, mark=*, blue] coordinates {(512,0.044) (1024,0.144) (2048,2.303) (4096,12.354) (8192,43.73)};
-            \addplot[smooth, mark=*, red] coordinates {(512,1.548) (1024,6.365) (2048,25.91) (4096,98.651) (8192,388.764)};
+            \addplot[smooth, mark=*, red] coordinates {(512,0.211) (1024,0.857) (2048,5.741) (4096,24.2) (8192,96.436)};
 
             \legend{OpenMP, Sequencial Otimizado}
         \end{axis}
     \end{tikzpicture}
-    \caption{Comparação do tempo de execução da implementação sequencial e da implementação OpenMP}
+    \caption{Comparação do tempo de execução da implementação sequencial e da implementação OpenMP (24 threads)}
     \label{fig:seq_omp_time_line_chart}
 \end{figure}
 
@@ -528,7 +529,7 @@ Durante a medição comparativa de desempenho, foram executadas 20 iterações p
         \begin{axis}[
                 ybar,
                 enlargelimits=0.15,
-                legend style={at={(0.5,-0.15)},
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
                         anchor=north,legend columns=-1},
                 ylabel={Speed Up},
                 symbolic x coords={512, 1024, 2048, 4096, 8192},
@@ -544,7 +545,7 @@ Durante a medição comparativa de desempenho, foram executadas 20 iterações p
             \legend{OpenMP}
         \end{axis}
     \end{tikzpicture}
-    \caption{Speed Up da implementação OpenMP com 24 threads}
+    \caption{Speed Up da implementação OpenMP (24 threads)}
     \label{fig:seq_omp_speedup_bar_chart}
 \end{figure}
 
@@ -579,7 +580,181 @@ A seguir, apresentamos os resultados obtidos com a implementação OpenMP com di
 
 \subsection{Análise de Desempenho - Memória Distribuída com Controller/Worker}
 
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+                enlargelimits=0.15,
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
+                        anchor=north,legend columns=-1},
+                ylabel={Média do Tempo de Execução (s)},
+                symbolic x coords={2, 4, 8, 16, 24},
+                xtick=data,
+                x tick label style={font=\small},
+                every node near coord/.append style={font=\tiny},
+            ]
+
+            \addplot[smooth, mark=*, blue] coordinates {(2,8.823) (4,6.228) (8,7.765) (16,11.503) (24,NaN)};
+
+            \legend{MPI (Controller/Worker)}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Comparação do tempo de execução da implementação MPI Controller/Worker com diferentes quantidades de processos}
+    \label{fig:mpi_cw_thread_line_chart}
+\end{figure}
+
+É possível observar na Figura \ref{fig:mpi_cw_thread_line_chart} que o tempo de execução diminui com o aumento da quantidade de processos, mas piora consideravelmente com mais de 8 processos. Isso ocorre devido ao overhead de comunicação entre os processos, já que todas as informações precisam passar pelo processo controlador, se tornando um gargalo de desempenho.
+
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+                enlargelimits=0.15,
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
+                        anchor=north,legend columns=-1},
+                ylabel={Média do Tempo de Execução (s)},
+                symbolic x coords={512, 1024, 2048, 4096, 8192},
+                xtick=data,
+                x tick label style={font=\small},
+                every node near coord/.append style={font=\tiny},
+            ]
+
+            \addplot[smooth, mark=*, blue] coordinates {(512,0.251) (1024,1.13) (2048,6.258) (4096,23.548) (8192,89.392)};
+            \addplot[smooth, mark=*, brown] coordinates {(512,0.082) (1024,0.284) (2048,2.515) (4096,11.021) (8192,43.785)};
+            \addplot[smooth, mark=*, red] coordinates {(512,0.211) (1024,0.857) (2048,5.741) (4096,24.2) (8192,96.436)};
+
+            \legend{
+                MPI C/W\\ (4 processos),
+                OpenMP\\(4 threads),
+                Sequencial\\Otimizado
+            }
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Comparação do tempo de execução das implemetações sequencial, OpenMP e MPI Controller/Worker}
+    \label{fig:seq_mpi_cw_time_line_chart}
+\end{figure}
+
+É possível observar na Figura \ref{fig:seq_mpi_cw_time_line_chart} que a implementação MPI Controller/Worker quase que se equipara à implementação Sequencial Otimizada. Isso acontece pelo mesmo motivo citado anteriormente, o overhead de comunicação entre os Processos.
+
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+                ybar,
+                enlargelimits=0.15,
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
+                        anchor=north,legend columns=-1},
+                ylabel={Speed Up},
+                symbolic x coords={512, 1024, 2048, 4096, 8192},
+                xtick=data,
+                nodes near coords,
+                nodes near coords align={vertical},
+                x tick label style={font=\small},
+                every node near coord/.append style={font=\small},
+                bar width=7pt,
+            ]
+            \addplot coordinates {(512,0.84) (1024,0.76) (2048,0.92) (4096,1.03) (8192,1.08)};
+
+            \legend{MPI C/W\\(4 processos)}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Speed Up da implementação MPI Controller/Worker}
+    \label{fig:seq_mpi_cw_speedup_bar_chart}
+\end{figure}
+
+É possível observar na Figura \ref{fig:seq_mpi_cw_speedup_bar_chart} que a implementação MPI Controller/Worker não apresenta um bom desempenho, em matrizes pequenas ele apresenta um Slow Down, representado por valores menores que 1. O que significa que a implementação sequencial é mais rápida que a implementação MPI Controller/Worker em certos casos.
+
+
 \subsection{Análise de Desempenho - Memória Distribuída com SPMD}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+                enlargelimits=0.15,
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
+                        anchor=north,legend columns=-1},
+                ylabel={Média do Tempo de Execução (s)},
+                symbolic x coords={2, 4, 8, 16, 24},
+                xtick=data,
+                x tick label style={font=\small},
+                every node near coord/.append style={font=\tiny},
+            ]
+
+            \addplot[smooth, mark=*, blue] coordinates {(2,2.7) (4,1.995) (8,1.747) (16,1.681) (24,NaN)};
+
+            \legend{MPI (SPMD)}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Comparação do tempo de execução da implementação MPI SPMD com diferentes quantidades de processos}
+    \label{fig:mpi_spmd_thread_line_chart}
+\end{figure}
+
+É possível observar na Figura \ref{fig:mpi_spmd_thread_line_chart} que o tempo de execução diminui com o aumento da quantidade de processos em todos os casos. Isso pode ser um indicador de que a implementação MPI SPMD é mais eficiente que a implementação MPI Controller/Worker, pois não há um gargalo de desempenho causado pelo processo controlador.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+                enlargelimits=0.15,
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
+                        anchor=north,legend columns=-1},
+                ylabel={Média do Tempo de Execução (s)},
+                symbolic x coords={512, 1024, 2048, 4096, 8192},
+                xtick=data,
+                x tick label style={font=\small},
+                every node near coord/.append style={font=\tiny},
+            ]
+
+            \addplot[smooth, mark=*, blue] coordinates {(512,0.045) (1024,0.137) (2048,1.681) (4096,9.14) (8192,36.588)};
+            \addplot[smooth, mark=*, gray] coordinates {(512,0.251) (1024,1.13) (2048,6.258) (4096,23.548) (8192,89.392)};
+            \addplot[smooth, mark=*, brown] coordinates {(512,0.082) (1024,0.284) (2048,2.515) (4096,11.021) (8192,43.785)};
+            \addplot[smooth, mark=*, red] coordinates {(512,0.211) (1024,0.857) (2048,5.741) (4096,24.2) (8192,96.436)};
+
+            \legend{
+                MPI SPMD\\ (16 processos),
+                MPI C/W\\ (4 processos),
+                OpenMP\\(16 threads),
+                Sequencial\\Otimizado
+            }
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Comparação do tempo de execução das implemetações sequencial, OpenMP e MPI Controller/Worker}
+    \label{fig:seq_mpi_spmd_time_line_chart}
+\end{figure}
+
+É possível observar na Figura \ref{fig:seq_mpi_spmd_time_line_chart} que
+como a implementação MPI SPMD não possui um gargalo de desempenho causado pelo processo controlador, ela é considerávelmente mais rápida que a implementação MPI Controller/Worker. É importante destacar que foi utilizada a versão de 4 processos da implementação MPI Controller/Worker para a comparação, pois é a versão que apresenta o melhor desempenho entre as versões com diferentes quantidades de processos.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+                ybar,
+                enlargelimits=0.15,
+                legend style={at={(0.5,-0.15)}, align=center, font=\small,
+                        anchor=north,legend columns=-1},
+                ylabel={Speed Up},
+                symbolic x coords={512, 1024, 2048, 4096, 8192},
+                xtick=data,
+                nodes near coords,
+                nodes near coords align={vertical},
+                x tick label style={font=\small},
+                every node near coord/.append style={font=\small},
+                bar width=7pt,
+            ]
+            \addplot coordinates {(512,4.69) (1024,6.26) (2048,3.42) (4096,2.65) (8192,2.64)};
+
+            \legend{MPI SPMD\\(16 processos)}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Speed Up da implementação MPI SPMD}
+    \label{fig:seq_mpi_spmd_speedup_bar_chart}
+\end{figure}
+
+Com a Figura \ref{fig:seq_mpi_spmd_speedup_bar_chart} podemos afirmar que a implementação MPI SPMD apresenta o melhor desempenho entre todas as implementações paralelas.
 
 \subsection{Análise de Desempenho - Cache e Gargalos}
 
